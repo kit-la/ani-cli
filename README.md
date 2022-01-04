@@ -1,3 +1,4 @@
+English readme [here.](./README-ENG.md)
 Esto es un prototipo para ani-cli en español. No está ni cerca de estar completo. 
 
 ## Cosas para hacer
