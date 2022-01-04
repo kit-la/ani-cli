@@ -27,8 +27,8 @@ vlc - An alternative video player
 
 ### Linux / Mac
 ```sh
-git clone https://github.com/pystardust/ani-cli.git
-cd ani-cli
+git clone https://github.com/kit-la/esp-anicli.git
+cd esp-anicli
 sudo make
 ```
 
