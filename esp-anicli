@@ -232,9 +232,7 @@ open_episode () {
 	printf "Getting data for episode %d\n" $episode
 
 	embedded_video_url=$(get_embedded_video_link "$anime_id" "$episode")
-	echo "$embedded_video_url"
 	video_url=$(get_links "$embedded_video_url")
-	echo "$video_url"
 #	case $video_url in
 #		*streamtape*)
 #			# If direct download not available then scrape streamtape.com
@@ -336,9 +334,6 @@ shift $((OPTIND - 1))
 ########
 # main #
 ########
-
-#base_url=$(resolve_url "$base_url")
-
 
 case $scrape in
 	query)
