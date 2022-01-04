@@ -5,7 +5,7 @@ all: install
 
 install:
 	# copies ani-cli file to /usr/local/bin/ani-cli, which should be in path
-	cp ani-cli $(DESTDIR)$(PREFIX)/bin/esp-anicli
+	cp esp-anicli $(DESTDIR)$(PREFIX)/bin/esp-anicli
 	# marks ani-cli executable
 	chmod 0755 $(DESTDIR)$(PREFIX)/bin/esp-anicli
 
