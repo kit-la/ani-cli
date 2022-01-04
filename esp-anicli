@@ -4,7 +4,7 @@
 # video_player ( needs to be able to play urls )
 player_fn="mpv"
 
-prog="esp-ani-cli"
+prog="esp-anicli"
 logfile="${XDG_CACHE_HOME:-$HOME/.cache}/esp-ani-hsts"
 base_url="https://www.animefenix.com"
 
