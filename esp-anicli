@@ -4,7 +4,7 @@
 # video_player ( needs to be able to play urls )
 player_fn="mpv"
 
-prog="esp-anicli"
+prog="esp-ani-cli"
 logfile="${XDG_CACHE_HOME:-$HOME/.cache}/esp-ani-hsts"
 base_url="https://www.animefenix.com"
 
@@ -40,9 +40,16 @@ err () {
 	printf "$c_red%s$c_reset\n" "$*" >&2
 }
 
-#resolve_url () {
-#	curl --silent --location --head --output /dev/null --write-out '%{url_effective}' -- $1
-#}
+
+
+dep_ch () {
+	for dep; do
+		if ! command -v "$dep" >/dev/null ; then
+			die "Program \"$dep\" not found. Please install it."
+		fi
+	done
+}
+
 
 search_anime () {
 	# get anime name along with its id
@@ -68,48 +75,71 @@ search_eps () {
 		  '	
 }
 
-get_embedded_video_link() {
 
-	# get the download page url
-	anime_id=$1
+
+def_sv_list(){
+	selected_id=$1
 	ep_no=$2
 
-	# credits to fork: https://github.com/Dink4n/ani-cli for the fix
-	# dub prefix takes the value "-dub" when dub is needed else is empty
-	embedded_sucio=$(curl -s "${base_url}/ver/${anime_id}-${ep_no}" |
-        sed -n -E '
-	        /^[[:space:]]*tabsArray\['\''1'\''\]/{s/^.*src='\''([^'\'']*)'\''.*/\1/p}
-               ' | tr ';' '&')
-
-        curl -s "$embedded_sucio" |
-        sed -n -E '
-	        /^[[:space:]]*playerContainer/{s/^.*src="..([^"]*)".*/https:\/\/www.animefenix.com\1/p}
-	        '
-	}
-
-get_links () {
-	embedded_video_url="$1"
-	curl -s "$embedded_video_url" |
-	sed -n -E '
-	/^[[:space:]]*sources:/{s/^.*file":"([^"]*)".*/\1/p}
-	' | tr -d '\\'
-
-
-#	tmp_url=$(printf '%s' "$video_url" | sed -n -E 's/(.*)\.([0-9]+\.[0-9]+)\.[0-9]+\.m3u8/\1.\2.m3u8/p')
-#	[ -z "$tmp_url" ] || video_url="$tmp_url"
-#	video_quality=$(get_video_quality "$embedded_video_url" "$video_url")
-
-	# Replace the video with highest quality video
-#	printf '%s' "$video_url" | sed -n -E "s/(.*)\.m3u8/\1.$video_quality.m3u8/p"
+	listasV=$(get_server_options "$selected_id" "$ep_no")
+	numlista=$(echo "$listasV" | wc -l)
+	numlista2=$((numlista/2))
 }
 
-dep_ch () {
-	for dep; do
-		if ! command -v "$dep" >/dev/null ; then
-			die "Program \"$dep\" not found. Please install it."
-		fi
-	done
+# Outputs list with both links and server names associated with an index
+get_server_options() {
+        anime_id=$1
+        ep_no=$2
+
+        curl -s "$base_url/ver/${anime_id}-${ep_no}" |
+		sed -n -E -e "s/^[[:space:]]*tabsArray\["\'"([0-9]*)"\'"\].*src="\'"([^"\'"]*)"\'".*/\1 \2/p" -e 's/^[[:space:]]*<a title="([^"]*)".*href="#vid([0-9]*).*/[\2] \1/p'	
 }
+
+
+# Gets the embedded link based on your election
+get_sv_embedded_link() { 
+	sv_index=$1
+	dirty_embedded=$(echo "$listasV" | head -n "$numlista2" | 
+		sed -n -E "/^$sv_index/{s/^([0-9]*) //p}" | tr ';' '&')
+        
+	case $sv_name in
+		"Amazon")	  
+			curl -s "$dirty_embedded" |
+		        sed -n -E '
+			/^[[:space:]]*playerContainer/{s/^.*src="..([^"]*)".*/https:\/\/www.animefenix.com\1/p}
+		                  '
+			;;
+	
+			*) echo "work in progress" ;; 
+	esac
+
+}
+
+sv_selection() {
+	lista=$(echo "$listasV" | tail -n $numlista2)
+	echo "\n${lista}\n\nSelect a server number: "
+	read sv_index_sel
+	tput reset
+	sv_name=$(echo "$lista" | sed -n -E "s/^\[$sv_index_sel\] ([:alpha:]*)/\1/p")
+}
+
+
+get_video_url() {
+	embedded_link=$1
+
+	case $sv_name in
+		"Amazon")
+			 curl -s "$embedded_link" |
+			 sed -n -E '
+		         /^[[:space:]]*sources:/{s/^.*file":"([^"]*)".*/\1/p}
+			 ' | tr -d '\\'
+			;;
+
+			*)
+			echo "work in progress" ;;		
+	esac
+}
+
 
 # get query
 get_search_query () {
@@ -229,22 +259,13 @@ open_episode () {
 		printf "$c_reset"
 	done
 
+	def_sv_list "$anime_id" "$episode"
+	sv_selection
+	
 	printf "Getting data for episode %d\n" $episode
 
-	embedded_video_url=$(get_embedded_video_link "$anime_id" "$episode")
-	video_url=$(get_links "$embedded_video_url")
-#	case $video_url in
-#		*streamtape*)
-#			# If direct download not available then scrape streamtape.com
-	#		BROWSER=${BROWSER:-firefox}
-	#		printf "scraping streamtape.com\n"
-	#		video_url=$(curl -s "$video_url" | sed -n -E '
-		#		/^<script>document/{
-		#		s/^[^"]*"([^"]*)" \+ '\''([^'\'']*).*/https:\1\2\&dl=1/p
-		#		q
-	#			}
-#			');;
-#	esac
+	embedded_video_url=$(get_sv_embedded_link "$sv_index_sel")
+	video_url=$(get_video_url "$embedded_video_url")
 
 	if [ $is_download -eq 0 ]; then
 		# write anime and episode number
@@ -255,7 +276,7 @@ open_episode () {
 		case $player_fn in
 
 			"mpv")
-				setsid $player_fn --http-header-fields="Referer: $embedded_video_url" "$video_url" >/dev/null 2>&1
+				setsid $player_fn --no-ytdl --http-header-fields="Referer: $embedded_video_url" "$video_url" >/dev/null 2>&1
 				;;
 			"vlc")
 				setsid $player_fn --http-referrer="$embedded_video_url" --adaptive-use-access "$video_url" >/dev/null 2>&1
@@ -274,19 +295,6 @@ open_episode () {
 		}
 	fi
 }
-
-
-################
-# Sv selection #
-################
-
-
-
-
-
-
-
-
 
 ############
 # Start Up #
@@ -334,6 +342,9 @@ shift $((OPTIND - 1))
 ########
 # main #
 ########
+
+#base_url=$(resolve_url "$base_url")
+
 
 case $scrape in
 	query)
@@ -422,6 +433,5 @@ while :; do
 			;;
 	esac
 
-	
 	open_episode "$selection_id" "$episode"
 done
